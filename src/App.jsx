@@ -1,10 +1,10 @@
-import TrimAudio from './TrimAudio'
+import AudioTrimmer from "./AudioTrimmer"
 
 function App() {
 
   return (
     <>
-    <TrimAudio/>
+    <AudioTrimmer/>
     </>
   )
 }
