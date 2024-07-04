@@ -97,6 +97,7 @@ const AudioTrimmer = () => {
     };
 
     const handleMergeSelected = async () => {
+        setMergedAudioURL(null) // we are doing this to clear the merged audio element before creating the new merged audio , it fixes the bug where user coulf not merge audio after merging it one time as the old merged audio element was not being cleared
         const selectedUrls = trimmedAudios.filter((audio) => audio.selected).map((audio) => audio.url);
         if (selectedUrls.length > 1) {
             const mergedAudioBlob = await useMergeAudio(selectedUrls);
