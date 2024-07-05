@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js';
+import EnvelopePlugin from 'wavesurfer.js/dist/plugins/envelope.esm.js';
 import useEncode from './hooks/useEncode';
 import useTrimAudio from './hooks/useTrimAudio';
 import useMergeAudio from './hooks/useMergeAudio';
 import TrimmedAudioTable from './TrimmedAudioTable';
+import useApplyEnvelopeToAudio from './hooks/useApplyEnvelopeToAudio';
 
 const AudioTrimmer = () => {
     const [zoomLevel, setZoomLevel] = useState(15);
     const [pauseFlag, setPauseFlag] = useState(true);
+    const [trimmedAudios, setTrimmedAudios] = useState([]);
+    const [mergedAudioURL, setMergedAudioURL] = useState(null);
+    const [modifiedAudioURL, setModifiedAudioURL] = useState(null); // State for modified audio URL
+    const [audioDuration, setAudioDuration] = useState(0);
+    const envelopeRef = useRef(null);
     const containerRef = useRef(null);
     const wavesurferRef = useRef(null);
     const zoomRef = useRef(null);
     const selectedRegionRef = useRef(null);
-    const [trimmedAudios, setTrimmedAudios] = useState([]);
-    const [mergedAudioURL, setMergedAudioURL] = useState(null);
     const regionAudioMapRef = useRef(new Map()); // Mapping of regions to audio URLs
 
     useEffect(() => {
@@ -24,8 +29,9 @@ const AudioTrimmer = () => {
             waveColor: 'rgb(200, 0, 200)',
             progressColor: 'rgb(100, 0, 100)',
             responsive: true,
-            url: '/src/Tragedy.wav',
-            barWidth:3,
+            backend: 'WebAudio',
+            url: '/src/vocals.wav',
+            barWidth: 3,
             barGap: 2,
             barRadius: 2,
             height: 90
@@ -45,6 +51,23 @@ const AudioTrimmer = () => {
             region.play();
         });
 
+        // Set the duration of the track once it is loaded
+        wavesurferRef.current.on('ready', () => {
+            setAudioDuration(wavesurferRef.current.getDuration());
+        });
+
+        envelopeRef.current = wavesurferRef.current.registerPlugin(
+            EnvelopePlugin.create({
+                volume: 1,
+                lineColor: 'rgba(255, 0, 0, 0.5)',
+                lineWidth: 4,
+                dragPointSize: window.innerWidth <= 768 ? 20 : 12,
+                dragLine: window.innerWidth > 768,
+                dragPointFill: 'rgba(0, 255, 255, 0.8)',
+                dragPointStroke: 'rgba(0, 0, 0, 0.5)',
+            })
+        );
+
         wsRegions.on('region-created', (region) => {
             selectedRegionRef.current = region;
             console.log('Region created:', region.start, region.end);
@@ -54,6 +77,7 @@ const AudioTrimmer = () => {
 
         return () => {
             wavesurferRef.current.destroy();
+            envelopeRef.current.destroy();
         };
     }, []);
 
@@ -96,8 +120,12 @@ const AudioTrimmer = () => {
         setTrimmedAudios(updatedAudios);
     };
 
+    const handleVolumeAutomation = () => {
+        envelopeRef.current.addPoint({ time: audioDuration / 2, volume: 0.9 });
+    };
+
     const handleMergeSelected = async () => {
-        setMergedAudioURL(null) // we are doing this to clear the merged audio element before creating the new merged audio , it fixes the bug where user coulf not merge audio after merging it one time as the old merged audio element was not being cleared
+        setMergedAudioURL(null); // Clear previous merged audio
         const selectedUrls = trimmedAudios.filter((audio) => audio.selected).map((audio) => audio.url);
         if (selectedUrls.length > 1) {
             const mergedAudioBlob = await useMergeAudio(selectedUrls);
@@ -106,16 +134,43 @@ const AudioTrimmer = () => {
         }
     };
 
+    const createWobbleEffect = () => {
+        const points = [];
+        for (let i = 0; i <= audioDuration; i = i + 0.125) {
+            points.push({
+                time: i,
+                volume: i % 0.25 === 0 ? 1 : 0,
+            });
+        }
+        envelopeRef.current.setPoints(points);
+    };
+
+    const handleGetModifiedAudio = async () => {
+        const originalAudioURL = '/src/Tragedy.wav'; // Original audio URL
+        const modifiedAudioBuffer = await useApplyEnvelopeToAudio(originalAudioURL , envelopeRef);
+        const modifiedAudioBlob = useEncode(modifiedAudioBuffer);
+        const modifiedAudioURL = URL.createObjectURL(modifiedAudioBlob);
+        setModifiedAudioURL(modifiedAudioURL); // Set state to update the audio element
+    };
+    
     return (
         <>
             <div ref={containerRef}></div>
             <input ref={zoomRef} onChange={handleZoom} type="range" min="10" max="1200" value={zoomLevel} />
             <button onClick={handlePause}>{pauseFlag ? 'Play' : 'Pause'}</button>
             <button onClick={handleMergeSelected}>Merge Selected</button>
+            <button onClick={handleVolumeAutomation}>Volume Automation</button>
+            <button onClick={createWobbleEffect}>Wobble</button>
+            <button onClick={handleGetModifiedAudio}>Get Modified Audio</button>
             <TrimmedAudioTable trimmedAudios={trimmedAudios} handleCheckboxChange={handleCheckboxChange} handleRemoveAudio={handleRemoveAudio} />
             {mergedAudioURL && (
                 <audio controls>
                     <source src={mergedAudioURL} type="audio/wav" />
+                </audio>
+            )}
+            {modifiedAudioURL && (
+                <audio controls>
+                    <source src={modifiedAudioURL} type="audio/wav" />
                 </audio>
             )}
         </>
