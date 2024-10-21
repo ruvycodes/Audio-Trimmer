@@ -106,7 +106,7 @@ const AudioTrimmer = () => {
     };
 
     const trimAndAddAudio = async (start, end, region) => {
-        const url = '/src/Tragedy.wav'; // Original audio URL
+        const url = '/src/vocals.wav'; // Original audio URL
         const trimmedAudioBuffer = await useTrimAudio(url, start, end);
         const trimmedAudioBlob = useEncode(trimmedAudioBuffer);
         const trimmedAudioURL = URL.createObjectURL(trimmedAudioBlob);
@@ -146,7 +146,7 @@ const AudioTrimmer = () => {
     };
 
     const handleGetModifiedAudio = async () => {
-        const originalAudioURL = '/src/Tragedy.wav'; // Original audio URL
+        const originalAudioURL = '/src/vocals.wav'; // Original audio URL
         const modifiedAudioBuffer = await useApplyEnvelopeToAudio(originalAudioURL , envelopeRef);
         const modifiedAudioBlob = useEncode(modifiedAudioBuffer);
         const modifiedAudioURL = URL.createObjectURL(modifiedAudioBlob);
